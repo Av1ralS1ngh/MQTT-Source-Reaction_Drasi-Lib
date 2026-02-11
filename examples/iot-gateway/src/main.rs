@@ -15,7 +15,7 @@
 use anyhow::Result;
 use drasi_lib::{DrasiLib, Query};
 use drasi_reaction_mqtt::{MqttReaction, MqttReactionConfig};
-use drasi_source_mqtt::{MqttSource, MqttSourceConfig};
+use drasi_source_mqtt::{MqttSource, MqttSourceConfig, OperationMode};
 use log::info;
 
 #[tokio::main]
@@ -31,6 +31,7 @@ async fn main() -> Result<()> {
         .client_id("drasi-iot-gateway-source")
         .node_label("SensorReading")
         .id_field("device_id")
+        .mode(OperationMode::Update)
         .build();
 
     let source = MqttSource::new(source_config)?;
