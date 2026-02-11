@@ -47,18 +47,53 @@ impl MqttConfig {
     }
 }
 
+use drasi_source_sdk::DebugPublisher;
+use std::error::Error;
+use async_trait::async_trait;
+
 #[tokio::main]
 async fn main() {
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 
-    let reactivator = ReactivatorBuilder::new()
+    // Default SOURCE_ID for local testing if not set
+    if env::var("SOURCE_ID").is_err() {
+        env::set_var("SOURCE_ID", "mqtt-source-local");
+    }
+
+    let builder = ReactivatorBuilder::new()
         .with_stream_producer(mqtt_stream)
         .with_deprovision_handler(deprovision)
         .without_context()
-        .build()
-        .await;
+        .with_port(8080); // Use 8080 to avoid permission issues locally
+
+    // Check if Dapr is available, otherwise use NoOpStateStore and DebugPublisher for local testing
+    let reactivator = if env::var("DAPR_HTTP_PORT").is_ok() || env::var("DAPR_GRPC_PORT").is_ok() {
+        builder.build().await
+    } else {
+        info!("Dapr not detected, using NoOpStateStore and DebugPublisher");
+        builder
+            .with_state_store(NoOpStateStore)
+            .with_publisher(DebugPublisher::new())
+            .build()
+            .await
+    };
 
     reactivator.start().await;
+}
+
+struct NoOpStateStore;
+
+#[async_trait]
+impl StateStore for NoOpStateStore {
+    async fn get(&self, _id: &str) -> Result<Option<Vec<u8>>, Box<dyn Error + Send + Sync>> {
+        Ok(None)
+    }
+    async fn put(&self, _id: &str, _data: Vec<u8>) -> Result<(), Box<dyn Error + Send + Sync>> {
+        Ok(())
+    }
+    async fn delete(&self, _id: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
+        Ok(())
+    }
 }
 
 async fn deprovision(_state_store: Arc<dyn StateStore + Send + Sync>) {
