@@ -19,6 +19,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
+use handlebars::Handlebars;
 use log::{error, info, warn};
 use rumqttc::{AsyncClient, MqttOptions, QoS};
 use serde_json::Value;
@@ -36,11 +37,14 @@ use crate::publisher;
 ///
 /// Subscribes to Drasi query results via [`ReactionBase`] and publishes each
 /// result batch as a JSON payload to an MQTT topic.
+/// Supports dynamic topics and payloads via Handlebars templates.
 pub struct MqttReaction {
     base: ReactionBase,
     config: MqttReactionConfig,
     /// MQTT client handle (set on start, cleared on stop).
     client: Arc<RwLock<Option<AsyncClient>>>,
+    /// Handlebars registry for rendering templates.
+    registry: Arc<Handlebars<'static>>,
 }
 
 impl MqttReaction {
@@ -48,11 +52,13 @@ impl MqttReaction {
     pub fn new(config: MqttReactionConfig) -> Self {
         let params = ReactionBaseParams::new(&config.id, config.queries.clone());
         let base = ReactionBase::new(params);
+        let registry = Arc::new(Handlebars::new());
 
         Self {
             base,
             config,
             client: Arc::new(RwLock::new(None)),
+            registry,
         }
     }
 }
@@ -113,8 +119,10 @@ impl Reaction for MqttReaction {
 
         // Clone what we need for the spawned tasks.
         let base = self.base.clone_shared();
-        let topic = self.config.topic.clone();
+        let topic_template = self.config.topic.clone();
+        let payload_template = self.config.payload_template.clone();
         let reaction_id = self.config.id.clone();
+        let registry = self.registry.clone();
 
         // Create shutdown channel.
         let shutdown_rx = self.base.create_shutdown_channel().await;
@@ -164,17 +172,28 @@ impl Reaction for MqttReaction {
                             }
                         }
 
-                        match publisher::result_to_payload(query_id, sequence, &added, &updated, &removed) {
-                            Ok(payload) => {
-                                if let Err(e) = client
-                                    .publish(&topic, QoS::AtLeastOnce, false, payload)
-                                    .await
-                                {
-                                    error!("[{reaction_id}] Failed to publish to MQTT: {e}");
+                        match publisher::result_to_payload(
+                            query_id, 
+                            sequence, 
+                            &added, 
+                            &updated, 
+                            &removed,
+                            &registry,
+                            &topic_template,
+                            payload_template.as_deref()
+                        ) {
+                            Ok(messages) => {
+                                for (topic, payload) in messages {
+                                    if let Err(e) = client
+                                        .publish(topic, QoS::AtLeastOnce, false, payload)
+                                        .await
+                                    {
+                                        error!("[{reaction_id}] Failed to publish to MQTT: {e}");
+                                    }
                                 }
                             }
                             Err(e) => {
-                                error!("[{reaction_id}] Failed to serialize result: {e}");
+                                error!("[{reaction_id}] Failed to process result: {e}");
                             }
                         }
                     }

@@ -1,74 +1,57 @@
-# MQTT Source & Reaction for Drasi Lib
+# MQTT Source & Reaction for Drasi
 
-This repository implements **MQTT Source** and **Reaction** plugins for [Drasi](https://drasi.io), enabling real-time change data capture and reaction processing over MQTT.
+This repository provides **MQTT Source** and **Reaction** plugins for [Drasi](https://drasi.io), enabling real-time change data capture and reaction processing over MQTT.
 
-It is structured as a Cargo workspace containing reusable library crates and an example implementation.
+## Components
 
-## Architecture
+### 1. MQTT Source (`drasi-source-mqtt`)
+Ingests JSON payloads from an MQTT topic into Drasi as Graph element updates.
+*   **Stateless Operation**: Configurable `OperationMode` controls how messages are treated.
+    *   **Insert**: Treats every message as a new entity (default).
+    *   **Update**: Treats every message as an update to an existing entity.
+*   **ID Mapping**: Extracts a specified JSON field to use as the Entity ID.
 
-- **`drasi-source-mqtt`**: A Source plugin that subscribes to MQTT topics, parses JSON payloads, and ingests them into Drasi as graph updates. It supports "UPSERT" semantics by tracking seen IDs to distinguish between `Create` and `Update` operations.
-- **`drasi-reaction-mqtt`**: A Reaction plugin that subscribes to Drasi continuous queries and publishes the results (Added/Updated/Deleted changes) to MQTT topics.
-- **`drasi-lib`**: The core library providing the plugin traits (`Source`, `Reaction`) and the runtime environment.
+### 2. MQTT Reaction (`drasi-reaction-mqtt`)
+Publishes Drasi query results to MQTT topics.
+*   **Dynamic Topics**: Supports Handlebars templates (e.g., `devices/{{device_id}}/alert`).
+*   **Flexible Payloads**:
+    *   **Templated**: Render custom JSON payloads for each result item using Handlebars.
+    *   **Batched**: Efficiently publish all results in a single standard JSON batch if no template is used.
 
-## Crates
+## Usage Examples
 
-| Crate                  | Type    | Description                                        |
-| ---------------------- | ------- | -------------------------------------------------- |
-| `drasi-source-mqtt`    | Library | Implements `drasi_lib::Source`.                    |
-| `drasi-reaction-mqtt`  | Library | Implements `drasi_lib::Reaction`.                  |
-| `examples/iot-gateway` | Binary  | Example application combining Source and Reaction. |
-
-## Usage
-
-### 1. MQTT Source configuration
-
+### MQTT Source Configuration
 ```rust
-use drasi_source_mqtt::{MqttSource, MqttSourceConfig};
+use drasi_source_mqtt::{MqttSource, MqttSourceConfig, OperationMode};
 
-let config = MqttSourceConfig::builder("my-source", "broker.hivemq.com", "sensors/#")
-    .node_label("Sensor")    // Label for the graph nodes
-    .id_field("device_id")   // JSON field to use as the Entity ID
+let config = MqttSourceConfig::builder("sensor-source", "broker.hivemq.com", "sensors/#")
+    .node_label("Sensor")    // Graph node label
+    .id_field("device_id")   // JSON field for ID
+    .mode(OperationMode::Update) // Treat messages as updates
     .build();
 
 let source = MqttSource::new(config)?;
 ```
 
-### 2. MQTT Reaction configuration
-
+### MQTT Reaction Configuration
 ```rust
 use drasi_reaction_mqtt::{MqttReaction, MqttReactionConfig};
 
 let config = MqttReactionConfig::builder(
-    "my-reaction",
+    "alert-reaction",
     "broker.hivemq.com", 
-    "alerts/temperature",
-    vec!["high-temp-alert".to_string()] // Queries to subscribe to
-).build();
+    "devices/{{device_id}}/commands", // Dynamic topic
+    vec!["high-temp-alert".to_string()]
+)
+.payload_template(r#"{"command": "shutdown", "reason": "{{temp}}"}"#) // Custom payload
+.build();
 
 let reaction = MqttReaction::new(config);
 ```
 
-### 3. Running the Gateway
-
-```rust
-let core = DrasiLib::builder()
-    .with_source(source)
-    .with_reaction(reaction)
-    .with_query(
-        Query::cypher("high-temp-alert")
-            .query("MATCH (n:Sensor) WHERE n.temp > 50 RETURN n")
-            .from_source("my-source")
-            .build()
-    )
-    .build()
-    .await?;
-
-core.start().await?;
-```
-
 ## Build & Test
 
-This project is a Cargo workspace.
+This project is a standard Cargo workspace.
 
 ```bash
 # Build all crates
@@ -77,12 +60,6 @@ cargo build --workspace
 # Run unit tests
 cargo test --workspace
 
-# Run the example gateway
-# (Requires an MQTT broker running on localhost:1883)
+# Run the example gateway (requires local MQTT broker)
 cargo run -p iot-gateway
 ```
-
-## Implementation Details
-
-- **Source Mapper**: The source uses a pure function `payload_to_source_change` that extracts IDs and maps JSON fields to Element Properties. It maintains a `seen_ids` set to correctly emit `ChangeOp::Create` for new entities and `ChangeOp::Update` for existing ones.
-- **Reaction Publisher**: The reaction serializes `QueryResult` objects into a standardized JSON format containing `added`, `updated`, and `removed` result sets.

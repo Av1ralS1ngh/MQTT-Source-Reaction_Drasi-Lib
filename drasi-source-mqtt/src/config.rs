@@ -16,6 +16,18 @@
 
 use serde::Deserialize;
 
+/// Operation mode for the source.
+#[derive(Debug, Clone, Copy, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum OperationMode {
+    /// Always treat incoming payloads as new entities (Insert).
+    #[default]
+    Insert,
+    /// Always treat incoming payloads as updates to existing entities (Update).
+    Update,
+    // Future: Upsert (requires Drasi support)
+}
+
 /// Configuration for the MQTT source.
 #[derive(Debug, Clone, Deserialize)]
 pub struct MqttSourceConfig {
@@ -38,6 +50,9 @@ pub struct MqttSourceConfig {
     /// JSON field name used as the entity ID (default: `"id"`).
     /// If the field is missing from a payload, a UUID is generated.
     pub id_field: String,
+    /// Operation mode for the source (default: `insert`).
+    #[serde(default)]
+    pub mode: OperationMode,
 }
 
 impl MqttSourceConfig {
@@ -58,6 +73,7 @@ impl MqttSourceConfig {
             password: None,
             node_label: "MqttMessage".to_string(),
             id_field: "id".to_string(),
+            mode: OperationMode::Insert,
         }
     }
 }
@@ -73,6 +89,7 @@ pub struct MqttSourceConfigBuilder {
     password: Option<String>,
     node_label: String,
     id_field: String,
+    mode: OperationMode,
 }
 
 impl MqttSourceConfigBuilder {
@@ -105,6 +122,11 @@ impl MqttSourceConfigBuilder {
         self.id_field = field.into();
         self
     }
+    
+    pub fn mode(mut self, mode: OperationMode) -> Self {
+        self.mode = mode;
+        self
+    }
 
     /// Build the config.
     pub fn build(self) -> MqttSourceConfig {
@@ -118,6 +140,7 @@ impl MqttSourceConfigBuilder {
             password: self.password,
             node_label: self.node_label,
             id_field: self.id_field,
+            mode: self.mode,
         }
     }
 }

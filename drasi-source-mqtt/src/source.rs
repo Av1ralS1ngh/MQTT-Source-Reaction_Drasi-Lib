@@ -19,7 +19,6 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use dashmap::DashSet;
 use log::{error, info, warn};
 use rumqttc::{AsyncClient, Event, Incoming, MqttOptions, QoS};
 use serde_json::Value;
@@ -41,8 +40,6 @@ use crate::mapper;
 pub struct MqttSource {
     base: SourceBase,
     config: MqttSourceConfig,
-    /// Track seen entity IDs for Create vs Update semantics.
-    seen_ids: Arc<DashSet<String>>,
     /// MQTT client handle (set on start, cleared on stop).
     client: Arc<RwLock<Option<AsyncClient>>>,
 }
@@ -56,7 +53,6 @@ impl MqttSource {
         Ok(Self {
             base,
             config,
-            seen_ids: Arc::new(DashSet::new()),
             client: Arc::new(RwLock::new(None)),
         })
     }
@@ -127,7 +123,7 @@ impl Source for MqttSource {
         let base = self.base.clone_shared();
         let id_field = self.config.id_field.clone();
         let node_label = self.config.node_label.clone();
-        let seen_ids = self.seen_ids.clone();
+        let mode = self.config.mode;
         let source_id = self.config.id.clone();
 
         // Create shutdown channel.
@@ -150,7 +146,7 @@ impl Source for MqttSource {
                                     &publish.payload,
                                     &id_field,
                                     &node_label,
-                                    &seen_ids,
+                                    mode,
                                 ) {
                                     Ok(change) => {
                                         if let Err(e) = base.dispatch_source_change(change).await {

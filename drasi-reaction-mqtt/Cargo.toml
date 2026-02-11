@@ -19,6 +19,7 @@ serde_json.workspace = true
 async-trait.workspace = true
 log.workspace = true
 anyhow.workspace = true
+handlebars = "6.4.0"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }

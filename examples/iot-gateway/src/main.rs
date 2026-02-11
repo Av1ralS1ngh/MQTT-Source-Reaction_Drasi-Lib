@@ -45,6 +45,7 @@ async fn main() -> Result<()> {
     )
     .port(1883)
     .client_id("drasi-iot-gateway-reaction")
+    .payload_template(r#"{"command": "shutdown", "reason": "{{temp}}"}"#)
     .build();
 
     let reaction = MqttReaction::new(reaction_config);
@@ -53,7 +54,7 @@ async fn main() -> Result<()> {
     // Detects SensorReadings where temperature > 30 and no existing alert is active
     // Note: The graph logic depends on your data model. This is a simple filters.
     let query = Query::cypher("high-temp-alert")
-        .query("MATCH (s:SensorReading) WHERE s.temperature > 30 RETURN s")
+        .query("MATCH (s:SensorReading) WHERE s.temperature > 30 RETURN s.temperature AS temp, s.device_id AS device_id")
         .from_source("mqtt-src")
         .build();
 

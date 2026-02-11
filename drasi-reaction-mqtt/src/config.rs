@@ -25,8 +25,10 @@ pub struct MqttReactionConfig {
     pub broker_host: String,
     /// MQTT broker port (default: 1883).
     pub port: u16,
-    /// MQTT topic to publish results to.
+    /// MQTT topic template to publish results to (e.g. `devices/{{device_id}}/commands`).
     pub topic: String,
+    /// Optional payload template (Handlebars). If not provided, default JSON serialization is used.
+    pub payload_template: Option<String>,
     /// MQTT client ID. Defaults to `"drasi-reaction-{id}"`.
     pub client_id: String,
     /// Optional MQTT username for authentication.
@@ -50,6 +52,7 @@ impl MqttReactionConfig {
             id: id.clone(),
             broker_host: broker_host.into(),
             topic: topic.into(),
+            payload_template: None,
             port: 1883,
             client_id: format!("drasi-reaction-{id}"),
             username: None,
@@ -64,6 +67,7 @@ pub struct MqttReactionConfigBuilder {
     id: String,
     broker_host: String,
     topic: String,
+    payload_template: Option<String>,
     port: u16,
     client_id: String,
     username: Option<String>,
@@ -74,6 +78,11 @@ pub struct MqttReactionConfigBuilder {
 impl MqttReactionConfigBuilder {
     pub fn port(mut self, port: u16) -> Self {
         self.port = port;
+        self
+    }
+
+    pub fn payload_template(mut self, template: impl Into<String>) -> Self {
+        self.payload_template = Some(template.into());
         self
     }
 
@@ -99,6 +108,7 @@ impl MqttReactionConfigBuilder {
             broker_host: self.broker_host,
             port: self.port,
             topic: self.topic,
+            payload_template: self.payload_template,
             client_id: self.client_id,
             username: self.username,
             password: self.password,
