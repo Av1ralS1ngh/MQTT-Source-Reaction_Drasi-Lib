@@ -15,7 +15,8 @@
 use anyhow::Result;
 use drasi_lib::{DrasiLib, Query};
 use drasi_reaction_mqtt::{MqttReaction, MqttReactionConfig};
-use drasi_source_mqtt::{MqttSource, MqttSourceConfig, OperationMode};
+use drasi_source_mqtt::config::OperationMode;
+use drasi_source_mqtt::{MqttSource, MqttSourceConfig};
 use log::info;
 
 #[tokio::main]
