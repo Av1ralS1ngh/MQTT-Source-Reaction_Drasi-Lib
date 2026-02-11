@@ -1,0 +1,14 @@
+[package]
+name = "iot-gateway"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+drasi-lib.workspace = true
+drasi-source-mqtt = { path = "../../drasi-source-mqtt" }
+drasi-reaction-mqtt = { path = "../../drasi-reaction-mqtt" }
+tokio = { workspace = true, features = ["signal"] }
+log.workspace = true
+env_logger = "0.11"
+anyhow.workspace = true

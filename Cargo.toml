@@ -1,20 +1,24 @@
-[package]
-name = "mqtt-reactivator"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+members = [
+    "drasi-source-mqtt",
+    "drasi-reaction-mqtt",
+    "examples/iot-gateway",
+]
+resolver = "2"
 
-[dependencies]
-tokio = { version = "1.40", features = ["full"] }
-drasi-source-sdk = "0.1.22"
+[workspace.package]
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/Av1ralS1ngh/MQTT-Source-Reaction_Drasi-Lib"
+
+[workspace.dependencies]
+drasi-lib = { git = "https://github.com/drasi-project/drasi-core.git", package = "drasi-lib" }
+drasi-core = { git = "https://github.com/drasi-project/drasi-core.git", package = "drasi-core" }
 rumqttc = "0.24"
+tokio = { version = "1.40", features = ["rt-multi-thread", "sync", "time", "macros"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-log = "0.4"
-env_logger = "0.11"
 async-trait = "0.1"
-anyhow = "1.0"
+log = "0.4"
 uuid = { version = "1.10", features = ["v4"] }
-getrandom = "0.2" # Pin to stable version to avoid edition2024 requirement in v0.3/0.4
-
-[features]
-default = []
+anyhow = "1.0"
