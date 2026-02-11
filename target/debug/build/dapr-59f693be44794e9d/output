@@ -1,0 +1,5 @@
+cargo:rerun-if-changed=dapr/proto/common/v1/common.proto
+cargo:rerun-if-changed=dapr/proto/runtime/v1/dapr.proto
+cargo:rerun-if-changed=dapr/proto/runtime/v1/appcallback.proto
+cargo:rerun-if-changed=examples/invoke/proto/helloworld.proto
+cargo:rerun-if-changed=.
